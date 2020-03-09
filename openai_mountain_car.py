@@ -2,6 +2,7 @@ import gym
 import numpy as np
 
 from GP import GP
+from GPRL import GPRL
 
 
 
@@ -69,22 +70,33 @@ if __name__ == '__main__':
 
     env.reset()
 
-    samples_train = sample_discreet_env(env,50)
+    test_sample_env = 0
+    if test_sample_env:
 
-    X_train, Y_train = create_train_test(samples_train)
+        samples_train = sample_discreet_env(env,50)
 
-    samples_test = sample_discreet_env(env,100)
+        X_train, Y_train = create_train_test(samples_train)
 
-    X_test, Y_test = create_train_test(samples_test)
+        samples_test = sample_discreet_env(env,100)
 
-    env.close()
+        X_test, Y_test = create_train_test(samples_test)
 
-    gp_1 = GP()
-    gp_1.train(X_train,Y_train[:,0])
-    gp_1.predict(X_test)
-    #gp_2 = GP()
-    #gp_2.train(X_train,Y_train)
+        env.close()
 
-    print('Done running GPRL')
+        gp_1 = GP()
+        gp_1.train(X_train,Y_train[:,0])
+        gp_1.predict(X_test)
+        #gp_2 = GP()
+        #gp_2.train(X_train,Y_train)
 
+        print('Done running GPRL')
+
+    test_gprl = 0
+    if test_gprl:
+
+        gprl = GPRL(env=env,gamma=0.8)
+
+        gprl.init_value(50)
+
+        gprl.plot_value_func()
 
