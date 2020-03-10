@@ -70,10 +70,10 @@ if __name__ == '__main__':
 
     env.reset()
 
-    test_sample_env = 0
+    test_sample_env = 1
     if test_sample_env:
 
-        samples_train = sample_discreet_env(env,50)
+        samples_train = sample_discreet_env(env,150)
 
         X_train, Y_train = create_train_test(samples_train)
 
@@ -84,8 +84,8 @@ if __name__ == '__main__':
         env.close()
 
         gp_1 = GP()
-        gp_1.train(X_train,Y_train[:,0])
-        gp_1.predict(X_test)
+        gp_1.train(X_train,Y_train[:])
+        gp_1.predict(X_test,Y_test[:])
         #gp_2 = GP()
         #gp_2.train(X_train,Y_train)
 

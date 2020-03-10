@@ -17,13 +17,15 @@ class GPRL:
     has been passed an enivironment obeject of the form used in the
     OPEN AI GYM implementations. I will be using the MountianCar Environment
     '''
-    def __init__(self,env,gamma):
+    def __init__(self,env,gamma,l):
         '''
         :param env: Gym style environment
         '''
         self.actions = [0,1,2]
         self.env = env
         self.gamma = gamma # future value discount rate
+        self.l = l # characteristic length scale
+
 
         ##################
         # Support points #
@@ -136,7 +138,7 @@ class GPRL:
             a = self.act_greedy(s)
 
             s,r,d = self.env.step(a)
-            
+
             if d:
                 break
 
