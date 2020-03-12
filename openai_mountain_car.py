@@ -42,7 +42,6 @@ def sample_discreet_env(env,N):
 
     return samples
 
-
 def create_train_test(samples):
     '''
     Create train and test sets for
@@ -73,7 +72,7 @@ if __name__ == '__main__':
     test_sample_env = 1
     if test_sample_env:
 
-        samples_train = sample_discreet_env(env,150)
+        samples_train = sample_discreet_env(env,3000)
 
         X_train, Y_train = create_train_test(samples_train)
 

@@ -4,11 +4,16 @@ import numpy as np
 
 class GP:
 
-    def __init__(self,k_func=None,sigma=0.5):
+    def __init__(self,k_func=None,sigma=0.5,l=1,v=1):
         self.k_func = k_func
         self.sigma = sigma
+        self.l = l  # characteristic length scale
+        self.sigma = sigma
+        self.v = v  # hyper parameter
 
         # Holder variables
+        self.mean = None
+        self.cov = None
         self.X = None
         self.X_star = None
         self.Y = None
@@ -20,7 +25,7 @@ class GP:
         self.K_s_s = None
         self.K_s_x = None
 
-    def k_gauss(self,x1, x2, sigma=4):
+    def k_gauss(self,x1, x2, sigma=0.5):
         diff = x1 - x2
         return np.exp(-(np.dot(diff,diff))/ (2 * sigma))
 
@@ -41,6 +46,18 @@ class GP:
                 v = k(X[i], Y[j])
                 K[i, j] = v
         return np.matrix(K)
+
+    def plot_sample(self,mu, K, N):
+        '''
+        Func for plotting dist of functions
+        :param mu: Array of functions describing the mean
+        :param K: Covariant matrix
+        :param N: number of samples
+        :return:
+        '''
+        f = np.random.multivariate_normal(mu, K, N)
+        plt.plot(f.T)
+        plt.show()
 
     def sample_discreet_env(self,env, N):
         '''
@@ -83,14 +100,16 @@ class GP:
         if self.k_func is None:
             self.k_func = self.k_gauss
 
-        self.K_x_x = self.k_mat(self.k_func,X,X)
-
         self.noise = np.eye(N) * self.sigma
 
-        f = np.random.multivariate_normal(np.zeros((N,)),self.K_x_x,1) # sample function
-        #self.Y = np.random.multivariate_normal(f.reshape((N,)),self.noise) # sample observations
-        #self.Y = np.matrix(self.Y.reshape((N,1)))
-        self.Y = np.matrix(Y.reshape((N,Y.shape[1])))
+        self.K_x_x = self.k_mat(self.k_func,X,X)
+
+        #f = np.random.multivariate_normal(np.zeros((N,)),self.K_x_x,1) # sample function
+
+        if len(Y.shape) == 1:
+            self.Y = np.matrix(Y.reshape((N,1)))
+        else:
+            self.Y = np.matrix(Y.reshape((N,Y.shape[1])))
 
         self.K_x_x_inv = np.linalg.inv(self.K_x_x + self.noise)
 
@@ -104,35 +123,24 @@ class GP:
 
         #plt.scatter(X, np.reshape(np.array(y), (N,)))
 
-        #plt.plot(X_star, mean, color='red')
-        #plt.plot(X_star, upper, color='blue')
-        #plt.plot(X_star, lower, color='blue')
-        #plt.show()
+        plt.plot(self.X_star, mean, color='red')
+        plt.plot(self.X_star, upper, color='blue')
+        plt.plot(self.X_star, lower, color='blue')
+        plt.show()
 
+    def plot_predict(self,Y_actual):
 
-
-    def predict(self,X_star,Y_actual):
-
-        self.K_s_s = self.k_mat(self.k_func,X_star,X_star)
-
-        self.K_s_x = self.k_mat(self.k_func,X_star,self.X)
-
-        self.mean = self.K_s_x*self.K_x_x_inv*self.Y
-
-        self.cov = self.K_s_s - self.K_s_x*self.K_x_x_inv*self.K_s_x.T
-
-
-        x_axis = [i for i in range(X_star.shape[0])]
+        x_axis = [i for i in range(self.X_star.shape[0])]
 
         y_hat = np.array(self.mean)
 
-        y_hat_pos = np.reshape(y_hat[:,0], (len(self.mean),))
-        y_hat_vel = np.reshape(y_hat[:,1], (len(self.mean),))
+        y_hat_pos = np.reshape(y_hat[:, 0], (len(self.mean),))
+        y_hat_vel = np.reshape(y_hat[:, 1], (len(self.mean),))
 
-        plt.plot(x_axis,Y_actual[:,0],color='red')
-        plt.plot(x_axis,y_hat_pos,color='blue')
+        plt.plot(x_axis, Y_actual[:, ], color='red')
+        plt.plot(x_axis, y_hat_pos, color='blue')
 
-        MSE = ((Y_actual - y_hat)**2).mean()
+        MSE = ((Y_actual - y_hat) ** 2).mean()
 
         print('Sum squared error {}'.format(MSE))
 
@@ -144,6 +152,16 @@ class GP:
         plt.show()
 
         print('')
+
+    def predict(self,X_star):
+
+        self.K_s_s = self.k_mat(self.k_func,X_star,X_star)
+
+        self.K_s_x = self.k_mat(self.k_func,X_star,self.X)
+
+        self.mean = self.K_s_x*self.K_x_x_inv*self.Y
+
+        self.cov = self.K_s_s - self.K_s_x*self.K_x_x_inv*self.K_s_x.T
 
 
 
