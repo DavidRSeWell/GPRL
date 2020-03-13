@@ -16,15 +16,29 @@ from matplotlib import cm
 from GP import GP
 
 
-def k_cov(x1, x2, v, l):
+def k_cov(x1, x2, v, l,sigma):
 
-    return (v**2)*np.exp(-np.dot((x1 - x2),(x1 - x2))*(1.0 / l**2))
+    A = (v**2)*np.exp(-np.dot((x1 - x2),(x1 - x2))*(1.0 / l**2))
+
+    if np.array_equal(x1,x2):
+        return A
+
+    else:
+        return A
 
 def dk_dl(x1,x2,v,l):
     return 2*(v**2)*(np.dot((x1 - x2),(x1 - x2))*np.exp(-np.dot((x1 - x2),(x1 - x2))*(1.0 / l**2))) / l**3
 
 def dk_dv(x1,x2,v,l):
     return 2*v*np.exp(-np.dot((x1 - x2),(x1 - x2))*(1.0 / l**2))
+
+def dk_dsigma(x1,x2,sigma):
+
+    if np.array_equal(x1,x2):
+        return 2*sigma
+
+    else:
+        return 0.0
 
 def sample_discreet_env(env,N):
     '''
@@ -131,12 +145,19 @@ class GPRL:
 
             s_p,r,d,n = self.env.step(a)
 
-            x, dx = self.env.env.state
+            if r < 0: r = 0
 
-            x_index = np.where(self.pos_m == x)[0][0]
-            dx_index = np.where(self.vel_m == dx)[0][0]
+            if d == True:
+                r = 1
 
-            a_v = r + self.gamma * self.V[x_index, dx_index]
+            #x_index = np.where(self.pos_m == x)[0][0]
+            #dx_index = np.where(self.vel_m == dx)[0][0]
+
+            self.GP_V.predict(s_p)
+
+            v_s = np.array(self.GP_V.mean)[0][0]
+
+            a_v = r + self.gamma * v_s
 
             if a_v > a_best_v:
                 a_max = a
@@ -184,8 +205,7 @@ class GPRL:
 
         print('Done bro')
 
-
-    def compute_max_marginal(self,wrt,GP,y):
+    def compute_max_marginal(self,GP,y):
         '''
         Maximize marginal likelihood
         :param wrt: The variable to maximize the likelihood w.r.t
@@ -200,10 +220,68 @@ class GPRL:
 
         A = np.dot(alpha,alpha.T) - K_inv
 
-        dk_dl_mat = GP.k_mat(lambda x,y: dk_dl(x, y, GP.v,GP.l),X,X)
-        #dk_dl_mat = GP.k_mat(lambda x,y: dk_dv(x, y, GP.v,GP.l),X,X)
+        # I am embarassed about the following code but its too late and im too tired to clean
+        l_linespace = np.linspace(0.1,8,10)
+        l_min = 999
+        best_l = GP.l
+        for l_i in l_linespace:
 
-        return np.array((1.0 / 2)*np.matrix.trace(np.dot(A,dk_dl_mat)))
+            dk_dl_mat = GP.k_mat(lambda x,y: dk_dl(x, y, GP.v,l_i),X,X)
+
+            min_l = np.array((1.0 / 2) * np.matrix.trace(np.dot(A, dk_dl_mat)))[0][0]
+
+            if min_l < l_min:
+                best_l = l_i
+                l_min = min_l
+
+        v_linespace = np.linspace(0.01, 2, 10)
+        v_min = 999
+        best_v = GP.v
+        for v_i in v_linespace:
+
+            dk_dv_mat = GP.k_mat(lambda x, y: dk_dv(x, y, v_i, GP.l),X,X)
+
+            min_v = np.array((1.0 / 2) * np.matrix.trace(np.dot(A, dk_dv_mat)))[0][0]
+
+            if min_v < v_min:
+                best_v = v_i
+                v_min = min_v
+
+        sigma_linespace = np.linspace(0.01, 2, 10)
+        sigma_min = 999
+        best_sigma = GP.sigma
+        '''
+        for sigma_i in sigma_linespace:
+
+            dk_dsigma_mat = GP.k_mat(lambda x,y: dk_dsigma(x,y,sigma_i),X,X)
+
+            min_sigma = np.array((1.0 / 2) * np.matrix.trace(np.dot(A, dk_dsigma_mat)))[0][0]
+
+            if min_sigma < sigma_min:
+                best_sigma = sigma_i
+                sigma_min = min_sigma
+        '''
+
+        '''
+        I = np.eye(K_inv.shape[0])
+
+        max_l = np.array((1.0 / 2)*np.matrix.trace(np.dot(A,dk_dl_mat)))
+
+        max_v = np.array((1.0 / 2)*np.matrix.trace(np.dot(A,dk_dv_mat)))
+
+        max_sigma = np.array((1.0 / 2)*np.matrix.trace(np.dot(A,2*I)))
+
+        max_l = np.clip(max_l,0.1,8)
+        max_v = np.clip(max_l,0.01,2)
+        max_sigma = np.clip(max_l,0.01,2)
+        '''
+        self.GP_V.k_funct = lambda x,y: k_cov(x,y,best_v,best_l,best_sigma)
+
+        GP_V.v = best_v
+        GP_V.l = best_l
+        GP_V.sigma = best_sigma
+
+        return best_l,best_v,best_sigma
 
     def compute_W_i(self,i):
         '''
@@ -269,32 +347,30 @@ class GPRL:
         # the reward at that point in the environment
         self.create_grid(m)
 
-    def get_max_derivative(self,N,wrt,Y):
+    def get_max_derivative(self,dK_dtheta,var_range):
         '''
         Plot the max marginal w.r.t a given variable
         for mulitiple values of that variable
         :param N:
         :return:
         '''
+        '''
+        m = []
 
-        if wrt == 'l':
-            v = np.linspace(1,N,N + 1)
-            #v = np.linspace(0,2,N + 1)
+        for v_i in var_range:
 
-            m = []
+            DK_DT = self.GP_V.
+            max_l = np.array((1.0 / 2) * np.matrix.trace(np.dot(A, dk_dl_mat)))
 
-            for v_i in v:
+            m.append(max_v)
 
-                self.GP_V.l = v_i
-                max_v = self.compute_max_marginal('l',self.GP_V,Y)[0][0]
-                m.append(max_v)
+        plt.plot(v,m)
+        plt.show()
+        '''
+        pass
 
-            plt.plot(v,m)
-            plt.show()
 
-            return v[np.argmin(m)]
-
-    def plot_value_func(self,V):
+    def plot_value_func(self,V,text=''):
         '''
         Plot the Value matrix in 3D
         :param V: Matrix were rows are position and columns are velocity
@@ -317,6 +393,7 @@ class GPRL:
         # Add a color bar which maps values to colors.
         fig.colorbar(surf, shrink=0.5, aspect=5)
 
+        plt.title(text)
         plt.show()
 
     def run(self,T=50):
@@ -334,7 +411,7 @@ class GPRL:
         ######################
 
 
-        self.init_value(m=5)
+        self.init_value(m=20)
 
         self.env.reset()
 
@@ -344,7 +421,7 @@ class GPRL:
 
         self.W = np.zeros((N**2,N**2))
 
-        Y = self.V.reshape((N**2,)) #init V with R
+        Y = self.V.reshape((N**2,1)) #init V with R
 
         S = self.S.reshape((N**2,2))
 
@@ -354,16 +431,9 @@ class GPRL:
 
         V_s = self.GP_V.mean.reshape((N,N))
 
-        self.plot_value_func(V_s)
+        self.plot_value_func(V_s,'original V')
 
-        '''
-        #max_marginal = self.compute_max_marginal('l',self.GP_V,Y)
-
-        l_max = self.get_max_derivative(10,'l',Y)
-
-        self.GP_V.k_func = k_func=lambda x,y: k_cov(x, y, self.GP_V.v,l_max)
-
-        #self.GP_V.l = l_max
+        self.compute_max_marginal(self.GP_V,Y)
 
         self.GP_V.train(S, Y)
 
@@ -371,13 +441,12 @@ class GPRL:
 
         V_s = self.GP_V.mean.reshape((N, N))
 
-        self.plot_value_func(V_s)
-        '''
-
+        self.plot_value_func(V_s,'Max Marginal')
 
         for t in range(T):
 
             R = np.zeros((S.shape[0],1))
+            V = np.zeros((S.shape[0],1))
             for i , s_i in enumerate(S):
 
                 a = self.act_greedy(s_i)
@@ -386,25 +455,45 @@ class GPRL:
 
                 s,r,d,_ = self.env.step(a)
 
+                if r < 0: r = 0
+
+                if d == True:
+                    r = 1
+
                 R[i] = r
 
-                self.compute_W_i(i)
+                s = s.reshape((1,s.shape[0]))
+
+                self.GP_V.predict(s)
+
+                v_s = np.array(self.GP_V.mean)[0][0]
+
+                V[i] = r + self.gamma*v_s
+
+                #self.compute_W_i(i)
 
             # COMPUTE V
-            I = np.eye(np.W.shape[0])
-            V = (I - self.gamma*np.dot(self.W,np.linalg.inv(self.GP_V.cov)))
-            V = np.dot(np.linalg.inv(V),R)
+            #I = np.eye(np.W.shape[0])
+            #V = (I - self.gamma*np.dot(self.W,np.linalg.inv(self.GP_V.cov)))
+            #V = np.dot(np.linalg.inv(V),R)
+
             self.V = V
 
-            Y = V.reshape((N ** 2,))  # init V with R
+            #Y = V.reshape((N ** 2,))  # init V with R
 
-            self.GP_V.train(S, Y)
+            self.GP_V.train(S, V)
+
+            self.GP_V.predict(S)
+
+            self.compute_max_marginal(self.GP_V, V)
+
+            self.GP_V.train(S, V)
 
             self.GP_V.predict(S)
 
             V_s = self.GP_V.mean.reshape((N, N))
 
-            self.plot_value_func(V_s)
+            self.plot_value_func(V_s,'Value at iteration {}'.format(t))
 
     def sample_env(self,p,v):
         '''
@@ -456,7 +545,31 @@ class GPRL:
 
         return samples
 
+    def simulate_env(self):
+        '''
+        Run the actual gym enviroment
+        to visualize how it performs
+        :param N:
+        :return:
+        '''
+        env_1 = gym.make('MountainCar-v0')
+        env = gym.wrappers.Monitor(env_1, '/Users/befeltingu/GPRL/Data/', force=True)
 
+        env.reset()
+
+        while True:
+
+            env.render()
+
+            action_r = self.act_greedy(env.env.state)
+
+            s,r,d,_ = env.step(action_r)  # take a random action
+
+            if d:
+                break
+
+        env.close()
+        env_1.close()
 
 
 if __name__ == '__main__':
@@ -464,15 +577,15 @@ if __name__ == '__main__':
     #############################
     # GPRL Hyper parameters
     #############################
-    T = 2 # number of iterations to run the model
+    T = 10 # number of iterations to run the model
 
 
     #############################
     # Value GP Hyper parameters
     #############################
-    V_SIGMA = 0.5 # noise
+    V_SIGMA = 0.01 # noise
     L = 1 # Length scale
-    V = 1 #
+    V = 0.1 #
 
     env = gym.make('MountainCar-v0')
 
@@ -482,10 +595,14 @@ if __name__ == '__main__':
 
     env.close()
 
-    gprl.compute_environment_dynamics()
+    #gprl.compute_environment_dynamics()
 
-    GP_V = GP(sigma=V_SIGMA,k_func=lambda x,y: k_cov(x, y, V,L))
+    GP_V = GP(V,L,V_SIGMA,k_func=lambda x,y: k_cov(x, y, V,L,V_SIGMA))
 
     gprl.GP_V = GP_V
 
     gprl.run(T=T)
+
+    gprl.simulate_env()
+
+

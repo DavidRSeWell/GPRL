@@ -4,12 +4,11 @@ import numpy as np
 
 class GP:
 
-    def __init__(self,k_func=None,sigma=0.5,l=1,v=1):
+    def __init__(self,v=None,l=None,sigma=None,k_func=None):
         self.k_func = k_func
+        self.v = v
+        self.l = l
         self.sigma = sigma
-        self.l = l  # characteristic length scale
-        self.sigma = sigma
-        self.v = v  # hyper parameter
 
         # Holder variables
         self.mean = None
@@ -98,6 +97,7 @@ class GP:
         self.X = X.copy()
         N = self.X.shape[0]
         if self.k_func is None:
+
             self.k_func = self.k_gauss
 
         self.noise = np.eye(N) * self.sigma

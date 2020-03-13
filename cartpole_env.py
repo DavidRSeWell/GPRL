@@ -1,11 +1,21 @@
 import gym
 #import matplotlib
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import streamlit as st
 #matplotlib.use('svg')
 
 
+
+class MountainCar:
+    def __init__(self):
+        pass
+
+    def reset(self):
+        pass
+
+    def step(self):
+        pass
 
 def H(x):
     '''
@@ -19,6 +29,15 @@ def H(x):
 
     else:
         return x / (np.sqrt(1 + 5*x**2))
+
+
+def dH_dt(x):
+
+    if x < 0:
+        return 2*x + 1
+
+    else:
+        return x / ((1 + 5*x**2)**(3/2))
 
 
 def H_Update(x,v,a,dt):
@@ -84,6 +103,22 @@ if __name__ == '__main__':
 
         plt.show()
 
+    plot_dH_dx = 1
+    if plot_dH_dx:
+        x = np.linspace(-1,1,50)
+
+        y = [dH_dt(x_i) for x_i in x]
+
+        plt.plot(x,y)
+
+        y_1 = [H(x_i) for x_i in x]
+
+        plt.plot(x, y_1)
+
+        plt.title('DH_DX')
+
+        plt.show()
+
     test_apply_force = 0
     if test_apply_force:
         x = np.linspace(-1, 1, 50)
@@ -104,7 +139,7 @@ if __name__ == '__main__':
 
         plt.show()
 
-    test_cart_env = 1
+    test_cart_env = 0
     if test_cart_env:
         test_gym()
 
