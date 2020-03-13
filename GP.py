@@ -11,7 +11,7 @@ class GP:
         self.sigma = sigma
 
         # Holder variables
-        self.mean = None
+        self.mean = 0
         self.cov = None
         self.X = None
         self.X_star = None
@@ -92,10 +92,12 @@ class GP:
 
         return samples
 
-    def train(self,X,Y):
+    def train(self,X,X_star,Y):
 
         self.X = X.copy()
+
         N = self.X.shape[0]
+
         if self.k_func is None:
 
             self.k_func = self.k_gauss
@@ -103,6 +105,8 @@ class GP:
         self.noise = np.eye(N) * self.sigma
 
         self.K_x_x = self.k_mat(self.k_func,X,X)
+
+        self.cov = self.K_x_x
 
         #f = np.random.multivariate_normal(np.zeros((N,)),self.K_x_x,1) # sample function
 
@@ -112,6 +116,14 @@ class GP:
             self.Y = np.matrix(Y.reshape((N,Y.shape[1])))
 
         self.K_x_x_inv = np.linalg.inv(self.K_x_x + self.noise)
+
+        self.K_s_s = self.k_mat(self.k_func, X_star, X_star)
+
+        self.K_s_x = self.k_mat(self.k_func, X_star, self.X)
+
+        self.mean = self.K_s_x * self.K_x_x_inv * self.Y
+
+        self.cov = self.K_s_s - self.K_s_x * self.K_x_x_inv * self.K_s_x.T
 
     def plot(self):
 
@@ -155,13 +167,15 @@ class GP:
 
     def predict(self,X_star):
 
-        self.K_s_s = self.k_mat(self.k_func,X_star,X_star)
+        #K_s_s = self.k_mat(self.k_func,X_star,X_star)
 
-        self.K_s_x = self.k_mat(self.k_func,X_star,self.X)
+        K_s_x = self.k_mat(self.k_func,X_star,self.X)
 
-        self.mean = self.K_s_x*self.K_x_x_inv*self.Y
+        mean = K_s_x*self.K_x_x_inv*self.Y
 
-        self.cov = self.K_s_s - self.K_s_x*self.K_x_x_inv*self.K_s_x.T
+        #cov = K_s_s - K_s_x*self.K_x_x_inv*K_s_x.T
+
+        return np.array(mean)[0][0]
 
 
 

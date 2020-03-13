@@ -57,12 +57,15 @@ def H_Update(x,v,a,dt):
 def test_gym():
 
     import gym
-    env = gym.make('MountainCar-v0')
-    #env = gym.wrappers.Monitor(env_to_wrap, '/Users/befeltingu/GPRL/Data/', force=True)
+    env_to_wrap = gym.make('MountainCar-v0')
+    env = gym.wrappers.Monitor(env_to_wrap, '/Users/befeltingu/GPRL/Data/', force=True)
+    env.min_position = -1
+    env.max_position = 1
+    env.max_speed = 1
     env.reset()
-    for _ in range(10):
-        #env.render()
-        action_r = 2
+    for _ in range(500):
+        env.render()
+        action_r = np.random.randint(0,3)
         env.step(action_r)  # take a random action
 
     env.close()
@@ -103,7 +106,7 @@ if __name__ == '__main__':
 
         plt.show()
 
-    plot_dH_dx = 1
+    plot_dH_dx = 0
     if plot_dH_dx:
         x = np.linspace(-1,1,50)
 
@@ -139,7 +142,7 @@ if __name__ == '__main__':
 
         plt.show()
 
-    test_cart_env = 0
+    test_cart_env = 1
     if test_cart_env:
         test_gym()
 
