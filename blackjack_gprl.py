@@ -1,3 +1,29 @@
+import rlcard
+from rlcard.agents.random_agent import RandomAgent
+from rlcard.utils.utils import set_global_seed
+
+# Make environment
+env = rlcard.make('blackjack')
+episode_num = 2
+
+# Set a global seed
+#set_global_seed(0)
+
+# Set up agents
+agent_0 = RandomAgent(action_num=env.action_num)
+env.set_agents([agent_0])
+
+for episode in range(episode_num):
+
+    # Generate data from the environment
+    trajectories, _ = env.run(is_training=True)
+
+    # Print out the trajectories
+    print('\nEpisode {}'.format(episode))
+    for ts in trajectories[0]:
+        print('State: {}, Action: {}, Reward: {}, Next State: {}, Done: {}'.format(ts[0], ts[1], ts[2], ts[3], ts[4]))
+
+
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -583,11 +609,6 @@ if __name__ == '__main__':
     #############################
     T = 20 # number of iterations to run the model
 
-    from gym import envs
-
-    print(envs.registry.all())
-
-
     #############################
     # Value GP Hyper parameters
     #############################
@@ -595,26 +616,22 @@ if __name__ == '__main__':
     L = 1 # Length scale
     V = 0.01 #
 
-    env = gym.make('MountainCar-v0')
-    #env.min_position = -1
-    #env.max_position = 1
-    #env.max_speed = 1
+    env = rlcard.make('blackjack')
+
     env.reset()
 
     gprl = GPRL(env,gamma=0.8,l=L,sigma=V_SIGMA,v=V)
 
-    #gprl.simulate_env()
+    gprl.simulate_env()
 
-    #env.close()
+    env.close()
 
     #gprl.compute_environment_dynamics()
 
-    GP_V = GP(V,L,V_SIGMA,k_func=lambda x,y: k_cov(x, y, V,L,V_SIGMA))
+    #GP_V = GP(V,L,V_SIGMA,k_func=lambda x,y: k_cov(x, y, V,L,V_SIGMA))
 
-    gprl.GP_V = GP_V
+    #gprl.GP_V = GP_V
 
-    gprl.run(T=T)
+    #gprl.run(T=T)
 
-    gprl.simulate_env()
-
-
+    #gprl.simulate_env()
