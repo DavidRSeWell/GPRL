@@ -1,29 +1,3 @@
-import rlcard
-from rlcard.agents.random_agent import RandomAgent
-from rlcard.utils.utils import set_global_seed
-
-# Make environment
-env = rlcard.make('blackjack')
-episode_num = 2
-
-# Set a global seed
-#set_global_seed(0)
-
-# Set up agents
-agent_0 = RandomAgent(action_num=env.action_num)
-env.set_agents([agent_0])
-
-for episode in range(episode_num):
-
-    # Generate data from the environment
-    trajectories, _ = env.run(is_training=True)
-
-    # Print out the trajectories
-    print('\nEpisode {}'.format(episode))
-    for ts in trajectories[0]:
-        print('State: {}, Action: {}, Reward: {}, Next State: {}, Done: {}'.format(ts[0], ts[1], ts[2], ts[3], ts[4]))
-
-
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -35,6 +9,7 @@ import gym
 import matplotlib.pyplot as plt
 import numpy as np
 
+from environments import BlackJack
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from matplotlib import cm
@@ -306,11 +281,11 @@ class GPRL:
         '''
         self.GP_V.k_func = lambda x,y: k_cov(x,y,best_v,best_l,best_sigma)
 
-        GP_V.v = best_v
-        GP_V.l = best_l
-        GP_V.sigma = best_sigma
+        self.GP_V.v = best_v
+        self.GP_V.l = best_l
+        self.GP_V.sigma = best_sigma
 
-        print('Max likelihood new params v = {}, l = {}, sigma = {}'.format(GP_V.v,GP_V.l,GP_V.sigma))
+        print('Max likelihood new params v = {}, l = {}, sigma = {}'.format(self.GP_V.v,self.GP_V.l,self.GP_V.sigma))
 
         return best_l,best_v,best_sigma
 
@@ -343,27 +318,6 @@ class GPRL:
 
         self.W[i] = W_i.reshape((W_i.shape[0],))
 
-    def create_grid(self,n=25):
-        '''
-        Create 2d grid of position,velocity values
-        :param n:
-        :return:
-        '''
-        min_pos = self.env.min_position
-        max_pos = self.env.max_position
-        max_speed = self.env.max_speed
-
-        self.pos_m = np.linspace(min_pos,max_pos,n)
-        self.vel_m = np.linspace(-max_speed,max_speed,n)
-
-        self.V = np.zeros((n,n))
-        self.S = np.zeros((n,n,2)) #TODO Get rid of hardcoded state length 2
-
-        for i, x in enumerate(self.pos_m):
-            for j, dx in enumerate(self.vel_m):
-                self.S[i,j] = np.array([x,dx])
-                self.V[i,j] = self.sample_env(x,dx)
-
     def init_value(self,m=25):
         '''
         Sample m support vectors and initialize
@@ -376,7 +330,8 @@ class GPRL:
 
         # For now just creating a grid of values initilized to
         # the reward at that point in the environment
-        self.create_grid(m)
+        S = self.sample_support_points(m)
+
 
     def get_max_derivative(self,dK_dtheta,var_range):
         '''
@@ -440,12 +395,9 @@ class GPRL:
         # Compute GP for ENV
         ######################
 
-
         self.init_value(m=20)
 
         self.env.reset()
-
-        s = self.env.env.state
 
         N = self.V.shape[0]
 
@@ -525,17 +477,6 @@ class GPRL:
 
             self.plot_value_func(V_s,'Value at iteration {}'.format(t))
 
-    def sample_env(self,p,v):
-        '''
-        :param p:
-        :param v:
-        :return:
-        '''
-
-        r1 = bool(p >= self.env.goal_position and v >= self.env.goal_velocity)
-
-        return r1
-
     def sample_discreet_env(self,M):
         '''
         Function to randomly grab samples from
@@ -544,36 +485,42 @@ class GPRL:
         :return:
         '''
 
-        min_pos = self.env.min_position
-        max_pos = self.env.max_position
-        max_speed = self.env.max_speed
-        goal_position = self.env.goal_position
-        goal_velocity = self.env.goal_velocity
-
         samples = []
 
-        for n in range(M):
-            sample_pos = np.random.uniform(min_pos, max_pos)
-
-            sample_vel = np.random.uniform(0, max_speed)
-
-            s = (sample_pos, sample_vel)
-
-            action = np.random.randint(3)
-
-            self.env.env.state = s  # set gym environment to the state to sample from
-
-            r1 = bool(sample_pos >= goal_position and sample_vel >= goal_velocity)
-
-            self.env.step(action)
-
-            s_p = self.env.env.state  # new state from the environment
-
-            r2 = bool(s_p[0] >= goal_position and s_p[1] >= goal_velocity)
-
-            samples.append((s, r1, action, s_p,r2))
-
         return samples
+
+    def sample_support_points(self,N):
+        '''
+        Sample support points for black Jack
+        We are going to be working with an infinite deck so
+        sampling with replacement. That means that it does not
+        matter what suit you get only the numeric number i.e 1 - 10.
+        1 = Ace
+        :return:
+        :param N: Number samples
+        '''
+
+        S = []
+        S_ace = []
+
+        while (len(S) < N):
+            hand = self.env.draw_hand()
+
+            useable_ace = self.env.usable_ace(hand)
+            if useable_ace:
+                S_ace.append(hand + [1])
+            else:
+                S.append(hand + [0])
+
+        while (len(S_ace) < N):
+
+            c_1 = 1
+            c_2 = self.env.draw_card()
+            hand = [c_1,c_2]
+            if self.env.usable_ace(hand):
+                S_ace.append(hand + [1])
+
+        return S + S_ace
 
     def simulate_env(self):
         '''
@@ -602,6 +549,7 @@ class GPRL:
         env_wrap.close()
 
 
+
 if __name__ == '__main__':
 
     #############################
@@ -616,13 +564,18 @@ if __name__ == '__main__':
     L = 1 # Length scale
     V = 0.01 #
 
-    env = rlcard.make('blackjack')
+    #env = rlcard.make('blackjack')
 
-    env.reset()
+    #env.reset()
+
+    env = BlackJack()
+    env.init_env()
 
     gprl = GPRL(env,gamma=0.8,l=L,sigma=V_SIGMA,v=V)
 
-    gprl.simulate_env()
+    #gprl.simulate_env()
+
+    gprl.sample_support_points(10)
 
     env.close()
 
